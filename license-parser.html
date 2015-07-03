@@ -1,0 +1,281 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="theme-color" content="#E64A19">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	
+	<title>Steam License Parser</title>
+	
+	<link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
+	<style type="text/css">
+		.masthead {
+			position: relative;
+			padding: 40px 0;
+			color: #fff;
+			text-align: center;
+			background: #020031;
+			background: -moz-linear-gradient(45deg,  #020031 0%, #6d3353 100%);
+			background: -webkit-gradient(linear, left bottom, right top, color-stop(0%,#020031), color-stop(100%,#6d3353));
+			background: -webkit-linear-gradient(45deg,  #020031 0%,#6d3353 100%);
+			background: linear-gradient(45deg,  #020031 0%,#6d3353 100%);
+			filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#020031', endColorstr='#6d3353',GradientType=1 );
+		}
+		
+		.masthead h1 {
+			font-size: 60px;
+			margin: 0;
+		}
+		
+		.footer {
+			text-align: center;
+			padding: 15px;
+			color: #555;
+		}
+		
+		.footer span {
+			color: #FA5994;
+		}
+		
+		#licenses {
+			margin: 50px 0 10px;
+		}
+		
+		#licenses-output {
+			margin-top: 10px;
+		}
+		
+		.licenses-list {
+			margin-bottom: 0;
+		}
+		
+		th.sort-header::-moz-selection { background:transparent; }
+		th.sort-header::selection      { background:transparent; }
+		th.sort-header { cursor:pointer; }
+		table th.sort-header:after {
+			content:'';
+			float:right;
+			margin-top:7px;
+			border-width:0 4px 4px;
+			border-style:solid;
+			border-color:#404040 transparent;
+			visibility:hidden;
+		}
+		table th.sort-header:hover:after {
+			visibility:visible;
+		}
+		table th.sort-up:after,
+		table th.sort-down:after,
+		table th.sort-down:hover:after {
+			visibility:visible;
+			opacity:0.4;
+		}
+		table th.sort-up:after {
+			border-bottom:none;
+			border-width:4px 4px 0;
+		}
+	</style>
+</head>
+<body>
+	<div class="masthead">
+		<div class="container">
+			<h1>Steam License Parser</h1>
+		</div>
+	</div>
+	
+	<div class="container container-main">
+		<textarea class="form-control" id="licenses" rows="12" autofocus required placeholder="Your pretty licenses. They're parsed in your browser, nothing is sent to my server."></textarea>
+		<button type="button" id="licenses-button" class="btn btn-lg btn-block btn-warning">Go!</button>
+		
+		<div class="well" id="licenses-output">
+			<ol class="licenses-list">
+				<li><a href="steam://open/console/">Open Steam console</a></li>
+				<li>Enter <span class="label label-warning">clear_console</span></li>
+				<li>Enter <span class="label label-success">licenses_print</span></li>
+				<li>Copy the output <i class="muted">(right click -> select all -> copy)</i></li>
+				<li>Paste copied text in the form above</li>
+			</ol>
+			
+			<hr>
+			
+			<h3>Too many licenses?</h3>
+			<p>There is a way to work around Steam client's buffer size limitation by using <a href="https://developer.valvesoftware.com/wiki/SteamCMD">SteamCMD</a>.</p>
+			<p>First, you will need to download it and login with your account normally.</p>
+			<p>After you've done that, you can use this command to save output into a file:</p>
+			<pre>steamcmd +login YOUR_ACCOUNT +licenses_print +quit > licenses.txt</pre>
+		</div>
+		
+		<div class="footer">with <span>♥</span> by <a href="https://xpaw.me" target="_blank">xPaw</a> &amp; <a href="https://rjackson.me/" target="_blank">RJackson</a></div>
+	</div>
+	
+	<script>
+	(function()
+	{
+		var licenseInput  = document.getElementById( 'licenses' ),
+			licenseOutput = document.getElementById( 'licenses-output' ),
+			entityMap =
+			{
+				"&": "&amp;",
+				"<": "&lt;",
+				">": "&gt;",
+				'"': '&quot;',
+				"'": '&#39;',
+				"/": '&#x2F;'
+			};
+		
+		function escapeHtml(string)
+		{
+			return String(string).replace(/[&<>"'\/]/g, function (s)
+			{
+				return entityMap[s];
+			});
+		}
+		
+		document.getElementById( 'licenses-button' ).onclick = function()
+		{
+			var i = 0,
+				line,
+				info_line,
+				textArray = licenseInput.value.split( '\n' ),
+				length = textArray.length;
+				very_nice_data_you_have_there = [],
+				purchase_type_counts = {},
+				purchase_location_counts = {};
+			
+			for( i = 0; i < length; i++ )
+			{
+				line = textArray[ i ];
+				
+				if( line.substring( 0, 8 ) !== 'License ' )
+				{
+					continue;
+				}
+				
+				if( i + 2 > length )
+				{
+					break;
+				}
+				
+				//line = line.match( /License (.*) \((\d+)\)/ );
+				line = line.match( /License packageID ([0-9]+)/ );
+				info_line = textArray[ i + 1 ].match( /^ - State\s*: (.+?)\( flags \d+? \) - Purchased : (.+?) in "(.*)", (.+?)$/ );
+				
+				if( line && info_line )
+				{
+					very_nice_data_you_have_there.push({
+						sub: parseInt(line[ 1 ], 10),
+						state: info_line[ 1 ],
+						purchase_date: new Date(info_line[ 2 ]),
+						purchase_location: info_line[ 3 ],
+						purchase_type: info_line[ 4 ],
+					});
+					
+					if( !purchase_type_counts[ info_line[ 4 ] ] )
+					{
+						purchase_type_counts[ info_line[ 4 ] ] = 0;
+					}
+					
+					purchase_type_counts[ info_line[ 4 ] ] += 1;
+					
+					if( !purchase_location_counts[ info_line[ 3 ] ] )
+					{
+						purchase_location_counts[ info_line[ 3 ] ] = 0;
+					}
+					
+					purchase_location_counts[ info_line[ 3 ] ] += 1;
+				}
+			}
+			
+			if( very_nice_data_you_have_there.length === 0 )
+			{
+				licenseOutput.className = 'well';
+				licenseOutput.innerText = 'You must be joking!';
+			}
+			else
+			{               
+				licenseOutput.className = '';
+				licenseOutput.innerHTML = '\
+				<div class="row">\
+					<div class="col-md-6">\
+						<h3>Purchase locations</h3>\
+						<table class="table table-striped">\
+							<thead>\
+								<tr>\
+									<th>Location</th>\
+									<th>Count</th>\
+								</tr>\
+							</thead>\
+							<tbody>\
+								' + Object.keys(purchase_location_counts).sort(function(a, b)
+								{
+									return purchase_location_counts[b] - purchase_location_counts[a];
+								}).map(function(key)
+								{
+									return '<tr>\
+												<td>' + (key ? escapeHtml(key) : '(empty)') + '</td>\
+												<td>' + purchase_location_counts[ key ] + '</td>\
+											</tr>';
+								}).join("") + '\
+							</tbody>\
+						</table>\
+					</div>\
+					<div class="col-md-6">\
+						<h3>Purchase types</h3>\
+						<table class="table table-striped">\
+							<thead>\
+								<tr>\
+									<th>Type</th>\
+									<th>Count</th>\
+								</tr>\
+							</thead>\
+							<tbody>\
+								' + Object.keys(purchase_type_counts).sort(function(a, b)
+								{
+									return purchase_type_counts[b] - purchase_type_counts[a];
+								}).map(function(key)
+								{
+									return '<tr>\
+												<td>' + escapeHtml(key) + '</td>\
+												<td>' + purchase_type_counts[ key ] + '</td>\
+											</tr>';
+								}).join("") + '\
+							</tbody>\
+						</table>\
+					</div>\
+				</div>\
+				\
+				<h3>Subscriptions</h3>\
+				\<p>You have ' + very_nice_data_you_have_there.length + ' subscriptions, they\'re pretty.</p>\
+				<table class="table table-striped" id="js-table-licenses">\
+					<thead>\
+						<tr>\
+							<th>SubID</th>\
+							<th>State</th>\
+							<th class="sort-default sort-down">Purchase Date</th>\
+							<th>Purchase Location</th>\
+							<th>Purchase Type</th>\
+						</tr>\
+					</thead>\
+					<tbody>\
+						' + very_nice_data_you_have_there.map(function(item)
+						{
+							return '<tr>\
+										<td><a href="//steamdb.info/sub/' + item.sub + '">' + item.sub + '</a></td>\
+										<td>' + escapeHtml(item.state) + '</td>\
+										<td data-sort="' + item.purchase_date.getTime() + '">' + item.purchase_date.toLocaleString() + '</td>\
+										<td>' + escapeHtml(item.purchase_location) + '</td>\
+										<td>' + escapeHtml(item.purchase_type) + '</td>\
+									</tr>';
+						}).join("") + '\
+					</tbody>\
+				</table>';
+				
+				new Tablesort( document.getElementById( 'js-table-licenses' ) );
+			}
+		};
+	}());
+	</script>
+	<script src="//cdnjs.cloudflare.com/ajax/libs/tablesort/3.0.2/tablesort.min.js"></script>
+</body>
+</html>

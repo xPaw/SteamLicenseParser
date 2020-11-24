@@ -131,7 +131,7 @@
 				}
 				
 				line = line.match( /License packageID ([0-9]+)/ );
-				info_line = textArray[ i + 1 ].match( /^ - State\s*: (.+?)\( flags \d+? \) - Purchased : (.+?) in "(.*)", (.+?)$/ );
+				info_line = textArray[ i + 1 ].match( /^ - State\s*: (.+?)\( ?flags (?:0x)?\d+? ?\) - Purchased : (.+?) in "(.*)", (.+?)$/ );
 				
 				if( line && info_line )
 				{
